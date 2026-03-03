@@ -1,0 +1,167 @@
+diff --git a/src/output_i2s/rmt_pulse.c b/src/output_i2s/rmt_pulse.c
+index f5ca71b..fdff465 100644
+--- a/src/output_i2s/rmt_pulse.c
++++ b/src/output_i2s/rmt_pulse.c
+@@ -1,89 +1,97 @@
+ #include "../output_common/render_method.h"
+-#include "esp_intr_alloc.h"
+ 
+ #ifdef RENDER_METHOD_I2S
+ 
+-#include "driver/rmt.h"
+-#include "rmt_pulse.h"
++#include "driver/rmt_tx.h"
+ 
+-#include "soc/rmt_struct.h"
+-
+-static intr_handle_t gRMT_intr_handle = NULL;
+-
+-// the RMT channel configuration object
+-static rmt_config_t row_rmt_config;
+-
+-// keep track of wether the current pulse is ongoing
++// Keep track of whether the current pulse is ongoing
+ volatile bool rmt_tx_done = true;
+ 
++static rmt_channel_handle_t tx_chan = NULL;
++static rmt_encoder_handle_t copy_encoder = NULL;
++
+ /**
+- * Remote peripheral interrupt. Used to signal when transmission is done.
++ * New Event Callback. Used to signal when transmission is done.
++ * This runs in the ISR context and replaces the old rmt_interrupt_handler.
+  */
+-static void IRAM_ATTR rmt_interrupt_handler(void* arg) {
++static bool IRAM_ATTR rmt_on_trans_done(rmt_channel_handle_t tx_chan, const rmt_tx_done_event_data_t *edata, void *user_ctx) {
+     rmt_tx_done = true;
+-    RMT.int_clr.val = RMT.int_st.val;
++    return false; // Return true only if a higher priority task was woken (e.g., via FreeRTOS queue)
+ }
+ 
+-// The extern line is declared in esp-idf/components/driver/deprecated/rmt_legacy.c. It has access
+-// to RMTMEM through the rmt_private.h header which we can't access outside the sdk. Declare our own
+-// extern here to properly use the RMTMEM smybol defined in
+-// components/soc/[target]/ld/[target].peripherals.ld Also typedef the new rmt_mem_t struct to the
+-// old rmt_block_mem_t struct. Same data fields, different names
+-typedef rmt_mem_t rmt_block_mem_t;
+-extern rmt_block_mem_t RMTMEM;
+-
+ void rmt_pulse_init(gpio_num_t pin) {
+-    row_rmt_config.rmt_mode = RMT_MODE_TX;
+-    // currently hardcoded: use channel 0
+-    row_rmt_config.channel = RMT_CHANNEL_1;
+-
+-    row_rmt_config.gpio_num = pin;
+-    row_rmt_config.mem_block_num = 2;
+-
+-    // Divide 80MHz APB Clock by 8 -> .1us resolution delay
+-    row_rmt_config.clk_div = 8;
++    // 1. Create the RMT TX channel
++    rmt_tx_channel_config_t tx_chan_config = {
++        .clk_src = RMT_CLK_SRC_DEFAULT, 
++        .gpio_num = pin,
++        .mem_block_symbols = 128,          // Equivalent to mem_block_num = 2 (64 symbols * 2)
++        .resolution_hz = 10000000,         // 10MHz clock -> 0.1us resolution (matches old clk_div = 8)
++        .trans_queue_depth = 4,            // Allow queuing up to 4 transactions
++    };
++    ESP_ERROR_CHECK(rmt_new_tx_channel(&tx_chan_config, &tx_chan));
+ 
+-    row_rmt_config.tx_config.loop_en = false;
+-    row_rmt_config.tx_config.carrier_en = false;
+-    row_rmt_config.tx_config.carrier_level = RMT_CARRIER_LEVEL_LOW;
+-    row_rmt_config.tx_config.idle_level = RMT_IDLE_LEVEL_LOW;
+-    row_rmt_config.tx_config.idle_output_en = true;
++    // 2. Register transmission done callback
++    rmt_tx_event_callbacks_t cbs = {
++        .on_trans_done = rmt_on_trans_done,
++    };
++    ESP_ERROR_CHECK(rmt_tx_register_event_callbacks(tx_chan, &cbs, NULL));
+ 
+-    esp_intr_alloc(
+-        ETS_RMT_INTR_SOURCE, ESP_INTR_FLAG_LEVEL3, rmt_interrupt_handler, 0, &gRMT_intr_handle
+-    );
++    // 3. Create a copy encoder (since we construct raw symbols manually)
++    rmt_copy_encoder_config_t copy_encoder_config = {};
++    ESP_ERROR_CHECK(rmt_new_copy_encoder(&copy_encoder_config, &copy_encoder));
+ 
+-    rmt_config(&row_rmt_config);
+-    rmt_set_tx_intr_en(row_rmt_config.channel, true);
++    // 4. Enable the RMT TX channel
++    ESP_ERROR_CHECK(rmt_enable(tx_chan));
+ }
+ 
+ void rmt_pulse_deinit() {
+-    esp_intr_disable(gRMT_intr_handle);
+-    esp_intr_free(gRMT_intr_handle);
++    if (tx_chan) {
++        rmt_disable(tx_chan);
++        rmt_del_channel(tx_chan);
++        tx_chan = NULL;
++    }
++    if (copy_encoder) {
++        rmt_del_encoder(copy_encoder);
++        copy_encoder = NULL;
++    }
+ }
+ 
+ void IRAM_ATTR pulse_ckv_ticks(uint16_t high_time_ticks, uint16_t low_time_ticks, bool wait) {
+     while (!rmt_tx_done) {
+-    };
+-    volatile rmt_item32_t* rmt_mem_ptr = &(RMTMEM.chan[row_rmt_config.channel].data32[0]);
++        // Wait for previous transmission to finish
++    }
++
++    // Static buffer because rmt_transmit is asynchronous. 
++    // The buffer must remain valid until the ISR finishes transmitting.
++    static rmt_symbol_word_t symbol;
++    
++    // Clear the struct just in case
++    symbol.val = 0; 
++    
+     if (high_time_ticks > 0) {
+-        rmt_mem_ptr->level0 = 1;
+-        rmt_mem_ptr->duration0 = high_time_ticks;
+-        rmt_mem_ptr->level1 = 0;
+-        rmt_mem_ptr->duration1 = low_time_ticks;
++        symbol.level0 = 1;
++        symbol.duration0 = high_time_ticks;
++        symbol.level1 = 0;
++        symbol.duration1 = low_time_ticks;
+     } else {
+-        rmt_mem_ptr->level0 = 1;
+-        rmt_mem_ptr->duration0 = low_time_ticks;
+-        rmt_mem_ptr->level1 = 0;
+-        rmt_mem_ptr->duration1 = 0;
++        symbol.level0 = 1;
++        symbol.duration0 = low_time_ticks;
++        symbol.level1 = 0;
++        symbol.duration1 = 0;
+     }
+-    RMTMEM.chan[row_rmt_config.channel].data32[1].val = 0;
++
++    rmt_transmit_config_t tx_config = {
++        .loop_count = 0, // No loop
++    };
++
+     rmt_tx_done = false;
+-    RMT.conf_ch[row_rmt_config.channel].conf1.mem_rd_rst = 1;
+-    RMT.conf_ch[row_rmt_config.channel].conf1.mem_owner = RMT_MEM_OWNER_TX;
+-    RMT.conf_ch[row_rmt_config.channel].conf1.tx_start = 1;
++
++    // Transmit the raw symbol via the copy encoder
++    ESP_ERROR_CHECK(rmt_transmit(tx_chan, copy_encoder, &symbol, sizeof(rmt_symbol_word_t), &tx_config));
++
+     while (wait && !rmt_tx_done) {
+-    };
++        // Spinlock waiting for completion
++    }
+ }
+ 
+ void IRAM_ATTR pulse_ckv_us(uint16_t high_time_us, uint16_t low_time_us, bool wait) {
+@@ -94,4 +102,4 @@ bool IRAM_ATTR rmt_busy() {
+     return !rmt_tx_done;
+ }
+ 
+-#endif
++#endif
+\ No newline at end of file

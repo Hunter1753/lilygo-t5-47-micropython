@@ -1,0 +1,82 @@
+diff --git a/ports/esp32/boards/LILYGO_T5_47/manifest.py b/ports/esp32/boards/LILYGO_T5_47/manifest.py
+new file mode 100644
+index 000000000..832942f05
+--- /dev/null
++++ b/ports/esp32/boards/LILYGO_T5_47/manifest.py
+@@ -0,0 +1 @@
++include("$(PORT_DIR)/boards/manifest.py")
+diff --git a/ports/esp32/boards/LILYGO_T5_47/mpconfigboard.cmake b/ports/esp32/boards/LILYGO_T5_47/mpconfigboard.cmake
+new file mode 100644
+index 000000000..8023217eb
+--- /dev/null
++++ b/ports/esp32/boards/LILYGO_T5_47/mpconfigboard.cmake
+@@ -0,0 +1,24 @@
++set(IDF_TARGET esp32)
++
++set(SDKCONFIG_DEFAULTS
++    boards/sdkconfig.base
++    boards/sdkconfig.ble
++    boards/sdkconfig.240mhz
++    boards/sdkconfig.spiram
++    boards/${MICROPY_BOARD}/sdkconfig.board
++)
++
++# Add epdiy as an IDF component.
++# EXTRA_COMPONENT_DIRS must be set before project.cmake is included.
++# mpconfigboard.cmake is included at line ~38 of ports/esp32/CMakeLists.txt,
++# before the project.cmake include at line ~63, so this placement is correct.
++get_filename_component(_EPDIY_DIR
++    "${CMAKE_CURRENT_LIST_DIR}/../../../../../epdiy" ABSOLUTE)
++list(APPEND EXTRA_COMPONENT_DIRS "${_EPDIY_DIR}")
++
++# esp32_common.cmake calls: idf_component_register(REQUIRES ${IDF_COMPONENTS})
++# Appending epdiy here ensures it appears in that REQUIRES list so that
++# the MicroPython IDF component links against it.
++list(APPEND IDF_COMPONENTS epdiy)
++
++set(MICROPY_FROZEN_MANIFEST ${MICROPY_BOARD_DIR}/manifest.py)
+diff --git a/ports/esp32/boards/LILYGO_T5_47/mpconfigboard.h b/ports/esp32/boards/LILYGO_T5_47/mpconfigboard.h
+new file mode 100644
+index 000000000..7c56eeffc
+--- /dev/null
++++ b/ports/esp32/boards/LILYGO_T5_47/mpconfigboard.h
+@@ -0,0 +1,2 @@
++#define MICROPY_HW_BOARD_NAME "LilyGo T5 4.7 EPaper"
++#define MICROPY_HW_MCU_NAME   "ESP32"
+diff --git a/ports/esp32/boards/LILYGO_T5_47/sdkconfig.board b/ports/esp32/boards/LILYGO_T5_47/sdkconfig.board
+new file mode 100644
+index 000000000..41729679d
+--- /dev/null
++++ b/ports/esp32/boards/LILYGO_T5_47/sdkconfig.board
+@@ -0,0 +1,13 @@
++# LilyGo T5 4.7" specific sdkconfig overrides
++
++# Flash: QIO mode at 80 MHz, 16 MB
++CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
++CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
++CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
++
++# PSRAM: 80 MHz quad mode
++# (sdkconfig.spiram already enables CONFIG_SPIRAM, cache workaround, and MALLOC)
++CONFIG_SPIRAM_SPEED_80M=y
++
++# Minimum silicon revision: ESP32-D0WQ6 is rev 3
++CONFIG_ESP32_REV_MIN_3=y
+diff --git a/ports/esp32/lockfiles/dependencies.lock.esp32 b/ports/esp32/lockfiles/dependencies.lock.esp32
+index 8ba25c770..5061c0013 100644
+--- a/ports/esp32/lockfiles/dependencies.lock.esp32
++++ b/ports/esp32/lockfiles/dependencies.lock.esp32
+@@ -25,11 +25,11 @@ dependencies:
+   idf:
+     source:
+       type: idf
+-    version: 5.5.1
++    version: 5.5.2
+ direct_dependencies:
+ - espressif/lan867x
+ - espressif/mdns
+ - idf
+-manifest_hash: 482087bc40f0e187795a9ef9ad08ef15a585b4cdabc296c715a9d19284622150
++manifest_hash: 71504b958ff9b5659c92ba274ffd22bf2124e98c8bc9cfd0373af19650a2527c
+ target: esp32
+ version: 2.0.0
