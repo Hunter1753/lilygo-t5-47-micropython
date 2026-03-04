@@ -13,6 +13,7 @@
 //
 // Colors: 0 = black, 15 = white (4-bit grayscale).
 
+#include <math.h>
 #include <stdbool.h>
 
 #include "py/mperrno.h"
@@ -250,6 +251,116 @@ static mp_obj_t epd_obj_fill_circle(size_t n_args, const mp_obj_t *args) {
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(epd_obj_fill_circle_obj, 5, 5, epd_obj_fill_circle);
+
+// ─── Angle helpers ────────────────────────────────────────────────────────────
+#ifndef M_PIf
+#define M_PIf 3.14159265f
+#endif
+
+// Normalize angle in degrees to [0, 360).
+static float normalize_angle_f(float a) {
+    a = fmodf(a, 360.0f);
+    return (a < 0.0f) ? a + 360.0f : a;
+}
+
+// True if angle `a` (degrees) lies within the clockwise arc from `start` to `end`.
+// `start` and `end` must already be normalized to [0, 360).
+static bool angle_in_arc(float a, float start, float end) {
+    a = normalize_angle_f(a);
+    if (start <= end) {
+        return a >= start && a <= end;
+    }
+    return a >= start || a <= end;  // arc wraps past 360°
+}
+
+// ─── arc(x, y, r, start, end, color) ─────────────────────────────────────────
+// Draw an arc outline. Angles are in degrees: 0 = right (east), 90 = down,
+// increasing clockwise. The arc is drawn from `start` to `end` clockwise.
+static mp_obj_t epd_obj_arc(size_t n_args, const mp_obj_t *args) {
+    epd_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+    EPD_CHECK_INIT(self);
+    int   cx    = mp_obj_get_int(args[1]);
+    int   cy    = mp_obj_get_int(args[2]);
+    int   r     = mp_obj_get_int(args[3]);
+    float start = (float)mp_obj_get_float(args[4]);
+    float end   = (float)mp_obj_get_float(args[5]);
+    uint8_t color = color_from_py(args[6]);
+    uint8_t *fb   = epd_hl_get_framebuffer(&self->hl);
+
+    if (r <= 0) return mp_const_none;
+
+    // Full-circle shortcut.
+    if (fabsf(end - start) >= 360.0f) {
+        epd_draw_circle(cx, cy, r, color, fb);
+        return mp_const_none;
+    }
+
+    // Angular step: ~one step per pixel on the circumference.
+    float step = 180.0f / (M_PIf * (float)r);
+    if (step < 0.01f) step = 0.01f;
+
+    float start_n = normalize_angle_f(start);
+    float end_n   = normalize_angle_f(end);
+    float sweep   = (start_n <= end_n) ? end_n - start_n
+                                       : 360.0f - start_n + end_n;
+    if (sweep < step) sweep = step;  // draw at least one pixel
+
+    for (float t = 0.0f; t <= sweep + step * 0.5f; t += step) {
+        float deg = fmodf(start_n + t, 360.0f);
+        float rad = deg * (M_PIf / 180.0f);
+        int px = cx + (int)roundf((float)r * cosf(rad));
+        int py = cy + (int)roundf((float)r * sinf(rad));
+        epd_draw_pixel(px, py, color, fb);
+    }
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(epd_obj_arc_obj, 7, 7, epd_obj_arc);
+
+// ─── fill_arc(x, y, r, start, end, color) ────────────────────────────────────
+// Draw a filled pie wedge (arc + two radii). Same angle convention as arc().
+static mp_obj_t epd_obj_fill_arc(size_t n_args, const mp_obj_t *args) {
+    epd_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+    EPD_CHECK_INIT(self);
+    int   cx    = mp_obj_get_int(args[1]);
+    int   cy    = mp_obj_get_int(args[2]);
+    int   r     = mp_obj_get_int(args[3]);
+    float start = (float)mp_obj_get_float(args[4]);
+    float end   = (float)mp_obj_get_float(args[5]);
+    uint8_t color = color_from_py(args[6]);
+    uint8_t *fb   = epd_hl_get_framebuffer(&self->hl);
+
+    if (r <= 0) return mp_const_none;
+
+    // Full-circle shortcut.
+    if (fabsf(end - start) >= 360.0f) {
+        epd_fill_circle(cx, cy, r, color, fb);
+        return mp_const_none;
+    }
+
+    float start_n = normalize_angle_f(start);
+    float end_n   = normalize_angle_f(end);
+    int r2 = r * r;
+
+    for (int py = cy - r; py <= cy + r; py++) {
+        if (py < 0 || py >= 540) continue;
+        int dy = py - cy;
+        for (int px = cx - r; px <= cx + r; px++) {
+            if (px < 0 || px >= 960) continue;
+            int dx = px - cx;
+            if (dx * dx + dy * dy > r2) continue;
+            if (dx == 0 && dy == 0) {
+                epd_draw_pixel(px, py, color, fb);
+                continue;
+            }
+            float a = atan2f((float)dy, (float)dx) * (180.0f / M_PIf);
+            if (angle_in_arc(a, start_n, end_n)) {
+                epd_draw_pixel(px, py, color, fb);
+            }
+        }
+    }
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(epd_obj_fill_arc_obj, 7, 7, epd_obj_fill_arc);
 
 // ─── set_text_color(fg[, bg]) ─────────────────────────────────────────────────
 // Set the foreground (and optionally background) color for write_text.
@@ -493,6 +604,8 @@ static const mp_rom_map_elem_t epd_obj_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_fill_rect),   MP_ROM_PTR(&epd_obj_fill_rect_obj) },
     { MP_ROM_QSTR(MP_QSTR_circle),      MP_ROM_PTR(&epd_obj_circle_obj) },
     { MP_ROM_QSTR(MP_QSTR_fill_circle),      MP_ROM_PTR(&epd_obj_fill_circle_obj) },
+    { MP_ROM_QSTR(MP_QSTR_arc),              MP_ROM_PTR(&epd_obj_arc_obj) },
+    { MP_ROM_QSTR(MP_QSTR_fill_arc),         MP_ROM_PTR(&epd_obj_fill_arc_obj) },
     { MP_ROM_QSTR(MP_QSTR_set_text_color),   MP_ROM_PTR(&epd_obj_set_text_color_obj) },
     { MP_ROM_QSTR(MP_QSTR_set_text_align),   MP_ROM_PTR(&epd_obj_set_text_align_obj) },
     { MP_ROM_QSTR(MP_QSTR_reset_text_props), MP_ROM_PTR(&epd_obj_reset_text_props_obj) },

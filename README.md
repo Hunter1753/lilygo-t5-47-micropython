@@ -83,6 +83,8 @@ All drawing methods write to an in-memory framebuffer. Call `update()` or `updat
 | `epd.fill_rect(x, y, w, h, color)` | Draw a filled rectangle. |
 | `epd.circle(x, y, r, color)` | Draw a circle outline with radius `r` centred at `(x, y)`. |
 | `epd.fill_circle(x, y, r, color)` | Draw a filled circle. |
+| `epd.arc(x, y, r, start, end, color)` | Draw an arc outline of radius `r` centred at `(x, y)` from angle `start` to `end`. |
+| `epd.fill_arc(x, y, r, start, end, color)` | Draw a filled pie wedge (arc + two radii). |
 | `epd.write_text(x, y, text, size)` | Draw `text` using FiraSans at `(x, y)`. `size` must be `12` or `20` (raises `ValueError` otherwise). Uses the colors and alignment set by the methods below. |
 | `epd.set_text_color(fg [, bg])` | Set foreground color (and optionally background color) for `write_text`. Colors are 0–15. |
 | `epd.set_text_align(flags)` | Set text alignment / background drawing flags. Pass one or more `epdiy.ALIGN_*` / `epdiy.DRAW_BACKGROUND` constants combined with `\|`. |
@@ -90,6 +92,37 @@ All drawing methods write to an in-memory framebuffer. Call `update()` or `updat
 | `epd.draw_framebuf(buf, width, height, format, x, y)` | Blit a MicroPython framebuffer (or any buffer-protocol object) onto the display framebuffer at `(x, y)`. See below. |
 | `epd.set_rotation(rot)` | Set the display rotation. Pass one of the `epdiy.ROT_*` constants. Affects all subsequent drawing and font calls. |
 | `epd.get_rotation()` | Return the current rotation as an integer (one of the `epdiy.ROT_*` values). |
+
+#### `epd.arc(x, y, r, start, end, color)` / `epd.fill_arc(x, y, r, start, end, color)`
+
+Draw an arc outline or a filled pie wedge centred at `(x, y)` with radius `r`.
+
+| Parameter | Description |
+|-----------|-------------|
+| `x`, `y` | Centre of the arc |
+| `r` | Radius in pixels |
+| `start` | Start angle in degrees (float or int) |
+| `end` | End angle in degrees (float or int) |
+| `color` | Gray value 0–15 |
+
+Angles follow screen convention: **0° = right (east), 90° = down, increasing clockwise**. Pass `start=0, end=360` (or any range ≥ 360°) to draw a full circle / disc.
+
+```python
+import epdiy
+
+epd = epdiy.EPD()
+epd.clear()
+
+# Quarter-circle arc (top-right quadrant)
+epd.arc(200, 200, 80, 0, 90, 0)
+
+# Filled pie slice (bottom half)
+epd.fill_arc(500, 270, 120, 0, 180, 0)
+
+epd.poweron()
+epd.update()
+epd.poweroff()
+```
 
 #### `epd.draw_framebuf(buf, width, height, format, x, y)`
 
