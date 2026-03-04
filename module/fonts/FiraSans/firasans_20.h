@@ -13373,7 +13373,7 @@ const EpdGlyph FiraSans_20Glyphs[] = {
     {36, 21, 40, 2, 25, 154, 194856},   // ➾
     {49, 19, 53, 2, 19, 196, 195010},   // ➿
 };
-const EpdEpdUnicodeInterval FiraSans_20Intervals[] = {
+const EpdUnicodeInterval FiraSans_20Intervals[] = {
     {0x20, 0x7E, 0x0},       {0xA0, 0xFF, 0x5F},      {0x2010, 0x205F, 0xBF},
     {0x2190, 0x21FF, 0x10F}, {0x2300, 0x23FF, 0x17F}, {0x25A0, 0x25FF, 0x27F},
     {0x2600, 0x26F0, 0x2DF}, {0x2700, 0x27BF, 0x3D0},

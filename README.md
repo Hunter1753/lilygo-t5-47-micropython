@@ -37,6 +37,10 @@ Colors are expressed as integers 0–15 (4-bit grayscale: 0 = black, 15 = white)
 | `epdiy.MODE_GC16` | 16-level grayscale mode (flashing) |
 | `epdiy.MODE_GL16` | 16-level grayscale mode (non-flashing, default) |
 | `epdiy.MODE_A2` | Fast animation mode (2-level) |
+| `epdiy.ALIGN_LEFT` | Left-align text lines (default) |
+| `epdiy.ALIGN_RIGHT` | Right-align text lines |
+| `epdiy.ALIGN_CENTER` | Centre-align text lines |
+| `epdiy.DRAW_BACKGROUND` | Fill the text bounding box with the background color |
 
 ### `epdiy.EPD()`
 
@@ -69,6 +73,10 @@ All drawing methods write to an in-memory framebuffer. Call `update()` or `updat
 | `epd.fill_rect(x, y, w, h, color)` | Draw a filled rectangle. |
 | `epd.circle(x, y, r, color)` | Draw a circle outline with radius `r` centred at `(x, y)`. |
 | `epd.fill_circle(x, y, r, color)` | Draw a filled circle. |
+| `epd.write_text(x, y, text, size)` | Draw `text` using FiraSans at `(x, y)`. `size` must be `12` or `20` (raises `ValueError` otherwise). Uses the colors and alignment set by the methods below. |
+| `epd.set_text_color(fg [, bg])` | Set foreground color (and optionally background color) for `write_text`. Colors are 0–15. |
+| `epd.set_text_align(flags)` | Set text alignment / background drawing flags. Pass one or more `epdiy.ALIGN_*` / `epdiy.DRAW_BACKGROUND` constants combined with `\|`. |
+| `epd.reset_text_props()` | Reset all font properties to defaults (black foreground, no background, left-aligned). |
 
 #### Refresh
 
@@ -86,6 +94,13 @@ epd = epdiy.EPD()
 epd.clear()
 epd.fill(15)                          # white background
 epd.fill_rect(10, 10, 200, 100, 0)   # black rectangle
+
+# draw centred white text on a black background
+epd.set_text_color(15, 0)            # white on black
+epd.set_text_align(epdiy.ALIGN_CENTER | epdiy.DRAW_BACKGROUND)
+epd.write_text(480, 50, "Hello!", 20)
+epd.reset_text_props()               # restore defaults for subsequent text
+
 epd.poweron()
 epd.update(epdiy.MODE_GL16)
 epd.poweroff()

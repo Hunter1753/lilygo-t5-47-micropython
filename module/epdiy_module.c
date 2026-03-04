@@ -15,13 +15,16 @@
 //
 // Colors: 0 = black, 15 = white (4-bit grayscale).
 
+#include <stdbool.h>
+
 #include "py/mperrno.h"
 #include "py/obj.h"
 #include "py/runtime.h"
 
 #include "epdiy.h"
 
-static const char *TAG = "epdiy_mp";
+#include "fonts/FiraSans/firasans_12.h"
+#include "fonts/FiraSans/firasans_20.h"
 
 // ─── Singleton guard ──────────────────────────────────────────────────────────
 // Only one EPD instance may be live at a time.
@@ -31,6 +34,7 @@ static bool epd_module_in_use = false;
 typedef struct _epd_obj_t {
     mp_obj_base_t base;
     EpdiyHighlevelState hl;
+    EpdFontProperties font_props;
     bool initialized;
 } epd_obj_t;
 
@@ -66,6 +70,7 @@ static mp_obj_t epd_make_new(const mp_obj_type_t *type,
     epd_init(&epd_board_lilygo_t5_47, &ED047TC1, EPD_LUT_64K);
     epd_set_vcom(1560);
     self->hl = epd_hl_init(EPD_BUILTIN_WAVEFORM);
+    self->font_props = epd_font_properties_default();
     self->initialized = true;
     epd_module_in_use = true;
     return MP_OBJ_FROM_PTR(self);
@@ -216,7 +221,6 @@ static mp_obj_t epd_obj_fill_rect(size_t n_args, const mp_obj_t *args) {
     uint8_t color = color_from_py(args[5]);
     uint8_t *fb = epd_hl_get_framebuffer(&self->hl);
     epd_fill_rect(r, color, fb);
-    int byte_offset = r.y * epd_width() / 2 + r.x / 2;
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(epd_obj_fill_rect_obj, 6, 6, epd_obj_fill_rect);
@@ -248,6 +252,72 @@ static mp_obj_t epd_obj_fill_circle(size_t n_args, const mp_obj_t *args) {
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(epd_obj_fill_circle_obj, 5, 5, epd_obj_fill_circle);
+
+// ─── set_text_color(fg[, bg]) ─────────────────────────────────────────────────
+// Set the foreground (and optionally background) color for write_text.
+// Colors are 0-15. bg defaults to 15 (white) when not given.
+static mp_obj_t epd_obj_set_text_color(size_t n_args, const mp_obj_t *args) {
+    epd_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+    EPD_CHECK_INIT(self);
+    self->font_props.fg_color = color_from_py(args[1]) >> 4;
+    if (n_args > 2) {
+        self->font_props.bg_color = color_from_py(args[2]) >> 4;
+    }
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(epd_obj_set_text_color_obj, 2, 3, epd_obj_set_text_color);
+
+// ─── reset_text_props() ───────────────────────────────────────────────────────
+// Reset all font properties to their defaults (black on transparent, left-aligned).
+static mp_obj_t epd_obj_reset_text_props(mp_obj_t self_in) {
+    epd_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    EPD_CHECK_INIT(self);
+    self->font_props = epd_font_properties_default();
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(epd_obj_reset_text_props_obj, epd_obj_reset_text_props);
+
+// ─── set_text_align(flags) ────────────────────────────────────────────────────
+// Set the text alignment / background flags for write_text.
+// Pass one of: epdiy.ALIGN_LEFT, ALIGN_RIGHT, ALIGN_CENTER, DRAW_BACKGROUND,
+// or a bitwise OR of multiple values.
+static mp_obj_t epd_obj_set_text_align(mp_obj_t self_in, mp_obj_t flags_in) {
+    epd_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    EPD_CHECK_INIT(self);
+    self->font_props.flags = (enum EpdFontFlags)mp_obj_get_int(flags_in);
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_2(epd_obj_set_text_align_obj, epd_obj_set_text_align);
+
+// ─── write_text(x, y, text, size) ────────────────────────────────────────────
+// Write a string using FiraSans at the given font size (12 or 20).
+// Uses the font properties set by set_text_color() / set_text_align().
+// Raises ValueError for unsupported sizes.
+static mp_obj_t epd_obj_write_text(size_t n_args, const mp_obj_t *args) {
+    epd_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+    EPD_CHECK_INIT(self);
+    int x = mp_obj_get_int(args[1]);
+    int y = mp_obj_get_int(args[2]);
+    const char *text = mp_obj_str_get_str(args[3]);
+    int size = mp_obj_get_int(args[4]);
+
+    const EpdFont *font;
+    if (size == 12) {
+        font = &FiraSans_12;
+    } else if (size == 20) {
+        font = &FiraSans_20;
+    } else {
+        mp_raise_ValueError(MP_ERROR_TEXT("font size must be 12 or 20"));
+    }
+
+    uint8_t *fb = epd_hl_get_framebuffer(&self->hl);
+    enum EpdDrawError err = epd_write_string(font, text, &x, &y, fb, &self->font_props);
+    if (err != EPD_DRAW_SUCCESS) {
+        mp_raise_OSError(MP_EIO);
+    }
+    return mp_const_none;
+}
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(epd_obj_write_text_obj, 5, 5, epd_obj_write_text);
 
 // ─── update([mode]) ───────────────────────────────────────────────────────────
 // mode defaults to MODE_GL16 (non-flashing, full 16-gray update).
@@ -302,7 +372,11 @@ static const mp_rom_map_elem_t epd_obj_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_rect),        MP_ROM_PTR(&epd_obj_rect_obj) },
     { MP_ROM_QSTR(MP_QSTR_fill_rect),   MP_ROM_PTR(&epd_obj_fill_rect_obj) },
     { MP_ROM_QSTR(MP_QSTR_circle),      MP_ROM_PTR(&epd_obj_circle_obj) },
-    { MP_ROM_QSTR(MP_QSTR_fill_circle), MP_ROM_PTR(&epd_obj_fill_circle_obj) },
+    { MP_ROM_QSTR(MP_QSTR_fill_circle),      MP_ROM_PTR(&epd_obj_fill_circle_obj) },
+    { MP_ROM_QSTR(MP_QSTR_set_text_color),   MP_ROM_PTR(&epd_obj_set_text_color_obj) },
+    { MP_ROM_QSTR(MP_QSTR_set_text_align),   MP_ROM_PTR(&epd_obj_set_text_align_obj) },
+    { MP_ROM_QSTR(MP_QSTR_reset_text_props), MP_ROM_PTR(&epd_obj_reset_text_props_obj) },
+    { MP_ROM_QSTR(MP_QSTR_write_text),       MP_ROM_PTR(&epd_obj_write_text_obj) },
     { MP_ROM_QSTR(MP_QSTR_update),      MP_ROM_PTR(&epd_obj_update_obj) },
     { MP_ROM_QSTR(MP_QSTR_update_area), MP_ROM_PTR(&epd_obj_update_area_obj) },
 };
@@ -326,8 +400,13 @@ static const mp_rom_map_elem_t epdiy_module_globals_table[] = {
     { MP_ROM_QSTR(MP_QSTR_MODE_GL16), MP_ROM_INT(MODE_GL16) },
     { MP_ROM_QSTR(MP_QSTR_MODE_A2),   MP_ROM_INT(MODE_A2) },
     // Display geometry constants for ED047TC1
-    { MP_ROM_QSTR(MP_QSTR_WIDTH),     MP_ROM_INT(960) },
-    { MP_ROM_QSTR(MP_QSTR_HEIGHT),    MP_ROM_INT(540) },
+    { MP_ROM_QSTR(MP_QSTR_WIDTH),            MP_ROM_INT(960) },
+    { MP_ROM_QSTR(MP_QSTR_HEIGHT),           MP_ROM_INT(540) },
+    // Font flags for set_text_align()
+    { MP_ROM_QSTR(MP_QSTR_DRAW_BACKGROUND),  MP_ROM_INT(EPD_DRAW_BACKGROUND) },
+    { MP_ROM_QSTR(MP_QSTR_ALIGN_LEFT),       MP_ROM_INT(EPD_DRAW_ALIGN_LEFT) },
+    { MP_ROM_QSTR(MP_QSTR_ALIGN_RIGHT),      MP_ROM_INT(EPD_DRAW_ALIGN_RIGHT) },
+    { MP_ROM_QSTR(MP_QSTR_ALIGN_CENTER),     MP_ROM_INT(EPD_DRAW_ALIGN_CENTER) },
 };
 static MP_DEFINE_CONST_DICT(epdiy_module_globals, epdiy_module_globals_table);
 
