@@ -51,7 +51,7 @@ static uint8_t color_from_py(mp_obj_t c_obj) {
 }
 
 // Read ambient temperature; fall back to 25 °C when no sensor is fitted
-// (epd_board_lilygo_t5_47 has get_temperature = NULL → returns 0.0).
+// (epd_board_lilygo_t5_47 has get_temperature = NULL -> returns 0.0).
 static int get_temperature(void) {
     int t = (int)epd_ambient_temperature();
     return t ? t : 25;
