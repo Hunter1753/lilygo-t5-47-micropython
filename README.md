@@ -176,22 +176,80 @@ epd.poweroff()
 ### Example
 
 ```python
+import time
 import epdiy
 
 epd = epdiy.EPD()
-epd.clear()
-epd.fill(15)                          # white background
-epd.fill_rect(10, 10, 200, 100, 0)   # black rectangle
+epd.clear()                          # full hardware clear
 
-# draw centred white text on a black background
-epd.set_text_color(15, 0)            # white on black
+# --- background ---
+epd.fill(15)                         # white background
+
+# --- temperature readout ---
+temp = epd.temperature()
+epd.set_text_color(0)                # black text, no background
+epd.write_text(10, 20, "Temp: {:.1f} C".format(temp), 12)
+
+# --- title (centred, white on black) ---
+epd.set_text_color(15, 0)
 epd.set_text_align(epdiy.ALIGN_CENTER | epdiy.DRAW_BACKGROUND)
-epd.write_text(480, 50, "Hello!", 20)
-epd.reset_text_props()               # restore defaults for subsequent text
+epd.write_text(480, 40, "epdiy demo", 20)
+epd.reset_text_props()
 
+# --- filled shapes ---
+epd.fill_rect(20, 80, 180, 100, 0)          # black filled rectangle
+epd.rect(210, 80, 180, 100, 0)              # rectangle outline
+epd.fill_circle(490, 130, 50, 3)            # dark-grey filled circle
+epd.circle(600, 130, 50, 0)                 # circle outline
+epd.fill_triangle(660, 180, 720, 80, 780, 180, 5)   # filled triangle
+epd.triangle(800, 180, 860, 80, 920, 180, 0)        # triangle outline
+
+# --- rounded rectangles ---
+epd.fill_round_rect(20, 210, 180, 80, 20, 2)        # dark filled
+epd.round_rect(210, 210, 180, 80, 20, 0)            # outline
+
+# --- arcs / pie wedges ---
+epd.fill_arc(520, 330, 80, 0, 270, 4)       # 3/4 filled pie
+epd.arc(700, 330, 80, 0, 270, 0)            # 3/4 arc outline
+
+# --- lines and pixels ---
+epd.hline(20, 320, 380, 0)                  # horizontal line
+epd.vline(385, 320, 80, 0)                  # vertical line
+epd.line(20, 340, 420, 380, 0)              # diagonal line
+epd.pixel(480, 450, 0)                      # single pixel
+
+# --- right-aligned label ---
+epd.set_text_align(epdiy.ALIGN_RIGHT)
+epd.write_text(900, 500, "bottom-right", 12)
+epd.reset_text_props()
+
+# --- push full frame ---
 epd.poweron()
 epd.update(epdiy.MODE_GL16)
 epd.poweroff()
+time.sleep(5)
+
+# --- partial update: redraw just the title bar ---
+epd.fill_rect(200, 0, 560, 60, 15)
+epd.set_text_color(0)
+epd.set_text_align(epdiy.ALIGN_CENTER)
+epd.write_text(480, 35, "partial refresh", 20)
+epd.reset_text_props()
+epd.poweron()
+epd.update_area(200, 0, 560, 60, epdiy.MODE_GC16)
+epd.poweroff()
+time.sleep(2)
+
+# --- demonstrate rotation ---
+epd.set_rotation(epdiy.ROT_PORTRAIT)
+print("rotation:", epd.get_rotation())      # 1 (portrait)
+epd.write_text(270, 30, "portrait mode", 20)
+epd.poweron()
+epd.update()
+epd.poweroff()
+epd.set_rotation(epdiy.ROT_LANDSCAPE) #reset rotation
+
+
 epd.deinit()
 del epd
 ```
