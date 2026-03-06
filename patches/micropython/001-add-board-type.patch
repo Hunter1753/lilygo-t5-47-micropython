@@ -10,7 +10,7 @@ new file mode 100644
 index 000000000..21a287b00
 --- /dev/null
 +++ b/ports/esp32/boards/EPDIY_V2_V3/mpconfigboard.cmake
-@@ -0,0 +1,26 @@
+@@ -0,0 +1,27 @@
 +set(IDF_TARGET esp32)
 +
 +set(SDKCONFIG_DEFAULTS
@@ -69,7 +69,7 @@ new file mode 100644
 index 000000000..e331e98f2
 --- /dev/null
 +++ b/ports/esp32/boards/EPDIY_V4/mpconfigboard.cmake
-@@ -0,0 +1,26 @@
+@@ -0,0 +1,27 @@
 +set(IDF_TARGET esp32)
 +
 +set(SDKCONFIG_DEFAULTS
@@ -128,7 +128,7 @@ new file mode 100644
 index 000000000..de82cfa4b
 --- /dev/null
 +++ b/ports/esp32/boards/EPDIY_V5/mpconfigboard.cmake
-@@ -0,0 +1,26 @@
+@@ -0,0 +1,27 @@
 +set(IDF_TARGET esp32)
 +
 +set(SDKCONFIG_DEFAULTS
@@ -187,7 +187,7 @@ new file mode 100644
 index 000000000..0393a95f6
 --- /dev/null
 +++ b/ports/esp32/boards/EPDIY_V6/mpconfigboard.cmake
-@@ -0,0 +1,26 @@
+@@ -0,0 +1,27 @@
 +set(IDF_TARGET esp32)
 +
 +set(SDKCONFIG_DEFAULTS
@@ -246,7 +246,7 @@ new file mode 100644
 index 000000000..5ff8acfe4
 --- /dev/null
 +++ b/ports/esp32/boards/EPDIY_V7/mpconfigboard.cmake
-@@ -0,0 +1,26 @@
+@@ -0,0 +1,27 @@
 +set(IDF_TARGET esp32s3)
 +
 +set(SDKCONFIG_DEFAULTS
@@ -305,7 +305,7 @@ new file mode 100644
 index 000000000..6ddbc5228
 --- /dev/null
 +++ b/ports/esp32/boards/EPDIY_V7_103/mpconfigboard.cmake
-@@ -0,0 +1,26 @@
+@@ -0,0 +1,27 @@
 +set(IDF_TARGET esp32s3)
 +
 +set(SDKCONFIG_DEFAULTS
@@ -364,7 +364,7 @@ new file mode 100644
 index 000000000..09a5f1f3a
 --- /dev/null
 +++ b/ports/esp32/boards/EPDIY_V7_RAW/mpconfigboard.cmake
-@@ -0,0 +1,26 @@
+@@ -0,0 +1,27 @@
 +set(IDF_TARGET esp32s3)
 +
 +set(SDKCONFIG_DEFAULTS
@@ -423,7 +423,7 @@ new file mode 100644
 index 000000000..ca1af2e7f
 --- /dev/null
 +++ b/ports/esp32/boards/LILYGO_S3/mpconfigboard.cmake
-@@ -0,0 +1,26 @@
+@@ -0,0 +1,27 @@
 +set(IDF_TARGET esp32s3)
 +
 +set(SDKCONFIG_DEFAULTS
@@ -482,7 +482,7 @@ new file mode 100644
 index 000000000..a6332c5f1
 --- /dev/null
 +++ b/ports/esp32/boards/LILYGO_T5_47/mpconfigboard.cmake
-@@ -0,0 +1,34 @@
+@@ -0,0 +1,35 @@
 +set(IDF_TARGET esp32)
 +
 +set(SDKCONFIG_DEFAULTS
@@ -545,3 +545,31 @@ index 000000000..41729679d
 +
 +# Minimum silicon revision: ESP32-D0WQ6 is rev 3
 +CONFIG_ESP32_REV_MIN_3=y
+diff --git a/ports/esp32/partitions-16MiB-large-app.csv b/ports/esp32/partitions-16MiB-large-app.csv
+new file mode 100644
+index 000000000..46797ed92
+--- /dev/null
++++ b/ports/esp32/partitions-16MiB-large-app.csv
+@@ -0,0 +1,8 @@
++# Partition table for 16 MiB flash — large app variant.
++# app: 4 MiB  |  vfs: ~12 MiB
++#
++# Name,   Type, SubType, Offset,   Size,     Flags
++nvs,      data, nvs,     0x9000,   0x6000,
++phy_init, data, phy,     0xf000,   0x1000,
++factory,  app,  factory, 0x10000,  0x400000,
++vfs,      data, fat,     0x410000, 0xBF0000,
+diff --git a/ports/esp32/partitions-16MiB-large-fs.csv b/ports/esp32/partitions-16MiB-large-fs.csv
+new file mode 100644
+index 000000000..f4f1a3005
+--- /dev/null
++++ b/ports/esp32/partitions-16MiB-large-fs.csv
+@@ -0,0 +1,8 @@
++# Partition table for 16 MiB flash — large filesystem variant.
++# app: 2 MiB  |  vfs: ~14 MiB
++#
++# Name,   Type, SubType, Offset,   Size,     Flags
++nvs,      data, nvs,     0x9000,   0x6000,
++phy_init, data, phy,     0xf000,   0x1000,
++factory,  app,  factory, 0x10000,  0x200000,
++vfs,      data, fat,     0x210000, 0xDF0000,
