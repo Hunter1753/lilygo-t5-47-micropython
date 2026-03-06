@@ -10,7 +10,7 @@ new file mode 100644
 index 000000000..21a287b00
 --- /dev/null
 +++ b/ports/esp32/boards/EPDIY_V2_V3/mpconfigboard.cmake
-@@ -0,0 +1,22 @@
+@@ -0,0 +1,26 @@
 +set(IDF_TARGET esp32)
 +
 +set(SDKCONFIG_DEFAULTS
@@ -20,6 +20,11 @@ index 000000000..21a287b00
 +    boards/sdkconfig.spiram
 +    boards/${MICROPY_BOARD}/sdkconfig.board
 +)
++
++# Optional user sdkconfig override — placed last to take precedence over all defaults
++if(USER_SDKCONFIG_FILE AND EXISTS "${USER_SDKCONFIG_FILE}")
++    list(APPEND SDKCONFIG_DEFAULTS "${USER_SDKCONFIG_FILE}")
++endif()
 +
 +get_filename_component(_EPDIY_DIR
 +    "${CMAKE_CURRENT_LIST_DIR}/../../../../../epdiy" ABSOLUTE)
@@ -64,7 +69,7 @@ new file mode 100644
 index 000000000..e331e98f2
 --- /dev/null
 +++ b/ports/esp32/boards/EPDIY_V4/mpconfigboard.cmake
-@@ -0,0 +1,22 @@
+@@ -0,0 +1,26 @@
 +set(IDF_TARGET esp32)
 +
 +set(SDKCONFIG_DEFAULTS
@@ -74,6 +79,11 @@ index 000000000..e331e98f2
 +    boards/sdkconfig.spiram
 +    boards/${MICROPY_BOARD}/sdkconfig.board
 +)
++
++# Optional user sdkconfig override — placed last to take precedence over all defaults
++if(USER_SDKCONFIG_FILE AND EXISTS "${USER_SDKCONFIG_FILE}")
++    list(APPEND SDKCONFIG_DEFAULTS "${USER_SDKCONFIG_FILE}")
++endif()
 +
 +get_filename_component(_EPDIY_DIR
 +    "${CMAKE_CURRENT_LIST_DIR}/../../../../../epdiy" ABSOLUTE)
@@ -118,7 +128,7 @@ new file mode 100644
 index 000000000..de82cfa4b
 --- /dev/null
 +++ b/ports/esp32/boards/EPDIY_V5/mpconfigboard.cmake
-@@ -0,0 +1,22 @@
+@@ -0,0 +1,26 @@
 +set(IDF_TARGET esp32)
 +
 +set(SDKCONFIG_DEFAULTS
@@ -128,6 +138,11 @@ index 000000000..de82cfa4b
 +    boards/sdkconfig.spiram
 +    boards/${MICROPY_BOARD}/sdkconfig.board
 +)
++
++# Optional user sdkconfig override — placed last to take precedence over all defaults
++if(USER_SDKCONFIG_FILE AND EXISTS "${USER_SDKCONFIG_FILE}")
++    list(APPEND SDKCONFIG_DEFAULTS "${USER_SDKCONFIG_FILE}")
++endif()
 +
 +get_filename_component(_EPDIY_DIR
 +    "${CMAKE_CURRENT_LIST_DIR}/../../../../../epdiy" ABSOLUTE)
@@ -172,7 +187,7 @@ new file mode 100644
 index 000000000..0393a95f6
 --- /dev/null
 +++ b/ports/esp32/boards/EPDIY_V6/mpconfigboard.cmake
-@@ -0,0 +1,22 @@
+@@ -0,0 +1,26 @@
 +set(IDF_TARGET esp32)
 +
 +set(SDKCONFIG_DEFAULTS
@@ -182,6 +197,11 @@ index 000000000..0393a95f6
 +    boards/sdkconfig.spiram
 +    boards/${MICROPY_BOARD}/sdkconfig.board
 +)
++
++# Optional user sdkconfig override — placed last to take precedence over all defaults
++if(USER_SDKCONFIG_FILE AND EXISTS "${USER_SDKCONFIG_FILE}")
++    list(APPEND SDKCONFIG_DEFAULTS "${USER_SDKCONFIG_FILE}")
++endif()
 +
 +get_filename_component(_EPDIY_DIR
 +    "${CMAKE_CURRENT_LIST_DIR}/../../../../../epdiy" ABSOLUTE)
@@ -226,7 +246,7 @@ new file mode 100644
 index 000000000..5ff8acfe4
 --- /dev/null
 +++ b/ports/esp32/boards/EPDIY_V7/mpconfigboard.cmake
-@@ -0,0 +1,22 @@
+@@ -0,0 +1,26 @@
 +set(IDF_TARGET esp32s3)
 +
 +set(SDKCONFIG_DEFAULTS
@@ -236,6 +256,11 @@ index 000000000..5ff8acfe4
 +    boards/sdkconfig.spiram_sx
 +    boards/${MICROPY_BOARD}/sdkconfig.board
 +)
++
++# Optional user sdkconfig override — placed last to take precedence over all defaults
++if(USER_SDKCONFIG_FILE AND EXISTS "${USER_SDKCONFIG_FILE}")
++    list(APPEND SDKCONFIG_DEFAULTS "${USER_SDKCONFIG_FILE}")
++endif()
 +
 +get_filename_component(_EPDIY_DIR
 +    "${CMAKE_CURRENT_LIST_DIR}/../../../../../epdiy" ABSOLUTE)
@@ -280,7 +305,7 @@ new file mode 100644
 index 000000000..6ddbc5228
 --- /dev/null
 +++ b/ports/esp32/boards/EPDIY_V7_103/mpconfigboard.cmake
-@@ -0,0 +1,22 @@
+@@ -0,0 +1,26 @@
 +set(IDF_TARGET esp32s3)
 +
 +set(SDKCONFIG_DEFAULTS
@@ -290,6 +315,11 @@ index 000000000..6ddbc5228
 +    boards/sdkconfig.spiram_sx
 +    boards/${MICROPY_BOARD}/sdkconfig.board
 +)
++
++# Optional user sdkconfig override — placed last to take precedence over all defaults
++if(USER_SDKCONFIG_FILE AND EXISTS "${USER_SDKCONFIG_FILE}")
++    list(APPEND SDKCONFIG_DEFAULTS "${USER_SDKCONFIG_FILE}")
++endif()
 +
 +get_filename_component(_EPDIY_DIR
 +    "${CMAKE_CURRENT_LIST_DIR}/../../../../../epdiy" ABSOLUTE)
@@ -334,7 +364,7 @@ new file mode 100644
 index 000000000..09a5f1f3a
 --- /dev/null
 +++ b/ports/esp32/boards/EPDIY_V7_RAW/mpconfigboard.cmake
-@@ -0,0 +1,22 @@
+@@ -0,0 +1,26 @@
 +set(IDF_TARGET esp32s3)
 +
 +set(SDKCONFIG_DEFAULTS
@@ -344,6 +374,11 @@ index 000000000..09a5f1f3a
 +    boards/sdkconfig.spiram_sx
 +    boards/${MICROPY_BOARD}/sdkconfig.board
 +)
++
++# Optional user sdkconfig override — placed last to take precedence over all defaults
++if(USER_SDKCONFIG_FILE AND EXISTS "${USER_SDKCONFIG_FILE}")
++    list(APPEND SDKCONFIG_DEFAULTS "${USER_SDKCONFIG_FILE}")
++endif()
 +
 +get_filename_component(_EPDIY_DIR
 +    "${CMAKE_CURRENT_LIST_DIR}/../../../../../epdiy" ABSOLUTE)
@@ -388,7 +423,7 @@ new file mode 100644
 index 000000000..ca1af2e7f
 --- /dev/null
 +++ b/ports/esp32/boards/LILYGO_S3/mpconfigboard.cmake
-@@ -0,0 +1,22 @@
+@@ -0,0 +1,26 @@
 +set(IDF_TARGET esp32s3)
 +
 +set(SDKCONFIG_DEFAULTS
@@ -398,6 +433,11 @@ index 000000000..ca1af2e7f
 +    boards/sdkconfig.spiram_sx
 +    boards/${MICROPY_BOARD}/sdkconfig.board
 +)
++
++# Optional user sdkconfig override — placed last to take precedence over all defaults
++if(USER_SDKCONFIG_FILE AND EXISTS "${USER_SDKCONFIG_FILE}")
++    list(APPEND SDKCONFIG_DEFAULTS "${USER_SDKCONFIG_FILE}")
++endif()
 +
 +get_filename_component(_EPDIY_DIR
 +    "${CMAKE_CURRENT_LIST_DIR}/../../../../../epdiy" ABSOLUTE)
@@ -442,7 +482,7 @@ new file mode 100644
 index 000000000..a6332c5f1
 --- /dev/null
 +++ b/ports/esp32/boards/LILYGO_T5_47/mpconfigboard.cmake
-@@ -0,0 +1,30 @@
+@@ -0,0 +1,34 @@
 +set(IDF_TARGET esp32)
 +
 +set(SDKCONFIG_DEFAULTS
@@ -452,6 +492,11 @@ index 000000000..a6332c5f1
 +    boards/sdkconfig.spiram
 +    boards/${MICROPY_BOARD}/sdkconfig.board
 +)
++
++# Optional user sdkconfig override — placed last to take precedence over all defaults
++if(USER_SDKCONFIG_FILE AND EXISTS "${USER_SDKCONFIG_FILE}")
++    list(APPEND SDKCONFIG_DEFAULTS "${USER_SDKCONFIG_FILE}")
++endif()
 +
 +# Add epdiy as an IDF component.
 +# EXTRA_COMPONENT_DIRS must be set before project.cmake is included.

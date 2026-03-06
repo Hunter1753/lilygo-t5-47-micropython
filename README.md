@@ -56,6 +56,32 @@ When the board type changes between builds, `build.sh` automatically runs `fullc
 
 `git tag v1.0.0 && git push origin v1.0.0`
 
+## Partition Size
+
+The app partition holds the compiled firmware (including any fonts you add with `add_font.py`).
+The remaining flash is available as a MicroPython filesystem for `.py` scripts and data files.
+On boards with 16 MiB flash (e.g. `LILYGO_T5_47`) you can tune this tradeoff.
+
+Copy `user.sdkconfig.example` to `user.sdkconfig` and uncomment one line:
+
+```sh
+cp user.sdkconfig.example user.sdkconfig
+# then edit user.sdkconfig and uncomment your preferred layout
+```
+
+| Setting in `user.sdkconfig`                                        | App    | Filesystem |
+|--------------------------------------------------------------------|--------|------------|
+| `CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions-16MiB-large-app.csv"` | 4 MiB  | ~12 MiB    |
+| `CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions-16MiB-large-fs.csv"`  | 1.9 MiB | ~14 MiB  |
+
+After changing `user.sdkconfig` run a full clean and rebuild:
+
+```sh
+./fullclean.sh && ./build.sh LILYGO_T5_47
+```
+
+`user.sdkconfig` is gitignored. Without it the default partition layout is used unchanged.
+
 ## Adding Custom Fonts
 
 The firmware ships with **FiraSans** at sizes 12 and 20. Additional TTF/OTF fonts can be compiled in using `add_font.py` (single font) or `convert_fonts.py` (batch). Use `clean_userfonts.sh` to remove all user fonts, or `python add_font.py --regen-registry` to rebuild the font registry from existing headers. See [docs/fonts.md](docs/fonts.md) for full details.

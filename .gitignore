@@ -5,3 +5,4 @@ fonts/*.ttf
 fonts/*.otf
 module/userfonts/
 .last_board
+user.sdkconfig

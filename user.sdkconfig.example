@@ -1,0 +1,19 @@
+# user.sdkconfig — optional build overrides for your board.
+#
+# Copy this file to user.sdkconfig and uncomment the settings you want.
+# This file is appended last to the build configuration, so it overrides
+# all board defaults. Run a full clean (fullclean.sh) after changing it.
+#
+# ─── Partition table (LILYGO_T5_47 and other 16 MiB boards) ────────────────
+#
+# The app partition holds the compiled firmware (including any fonts you add
+# with add_font.py). The remaining flash is available as a MicroPython
+# filesystem for your .py scripts and data files.
+#
+# Pick ONE layout and uncomment it:
+
+# More app space (4 MiB) — fits many compiled-in fonts; ~12 MiB for .py files
+# CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions-16MiB-large-app.csv"
+
+# More filesystem space — fewer compiled fonts; ~14 MiB for .py files
+# CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions-16MiB-large-fs.csv"

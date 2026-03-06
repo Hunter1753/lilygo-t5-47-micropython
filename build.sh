@@ -18,5 +18,11 @@ fi
 
 echo "$BOARD" > "$LAST_BOARD_FILE"
 
+USER_SDK_ARG=""
+PROJECT_ROOT=$(cd "$(dirname "$0")" && pwd)
+if [ -f "$PROJECT_ROOT/user.sdkconfig" ]; then
+    USER_SDK_ARG="-D USER_SDKCONFIG_FILE=$PROJECT_ROOT/user.sdkconfig"
+fi
+
 cd micropython/ports/esp32
-idf.py -D MICROPY_BOARD=$BOARD -D USER_C_MODULES=$(pwd)/../../../module/micropython.cmake -B ../../../build/$BOARD build
+idf.py -D MICROPY_BOARD=$BOARD $USER_SDK_ARG -D USER_C_MODULES=$(pwd)/../../../module/micropython.cmake -B ../../../build/$BOARD build
