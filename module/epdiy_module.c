@@ -25,6 +25,14 @@
 #include "fonts/FiraSans/firasans_12.h"
 #include "fonts/FiraSans/firasans_20.h"
 
+typedef struct { const char *name; int size; const EpdFont *font; } FontEntry;
+
+#if __has_include("./userfonts/userfonts.h")
+#include "userfonts/userfonts.h"
+#else
+static const FontEntry user_font_table[] = {{NULL, 0, NULL}};
+#endif
+
 // ─── Singleton guard ──────────────────────────────────────────────────────────
 // Only one EPD instance may be live at a time.
 static bool epd_module_in_use = false;
@@ -533,16 +541,47 @@ static mp_obj_t epd_obj_set_text_align(mp_obj_t self_in, mp_obj_t flags_in) {
 static MP_DEFINE_CONST_FUN_OBJ_2(epd_obj_set_text_align_obj, epd_obj_set_text_align);
 
 // ─── Font helpers ─────────────────────────────────────────────────────────────
-static const EpdFont *font_from_size(int size) {
-    if (size == 12) return &FiraSans_12;
-    if (size == 20) return &FiraSans_20;
+static const EpdFont *font_from_name_size(const char *name, int size) {
+    if (strcmp(name, "FiraSans") == 0) {
+        if (size == 12) return &FiraSans_12;
+        if (size == 20) return &FiraSans_20;
+    }
+    for (int i = 0; user_font_table[i].name != NULL; i++) {
+        if (strcmp(user_font_table[i].name, name) == 0 && user_font_table[i].size == size)
+            return user_font_table[i].font;
+    }
     return NULL;
 }
 
-// ─── write_text(x, y, text, size) ────────────────────────────────────────────
-// Write a string using FiraSans at the given font size (12 or 20).
+// ─── list_fonts() → [(name, size), ...] ──────────────────────────────────────
+// Returns all available fonts as a list of (font_name, size) tuples.
+static mp_obj_t epd_obj_list_fonts(mp_obj_t self_in) {
+    epd_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    EPD_CHECK_INIT(self);
+    mp_obj_t result = mp_obj_new_list(0, NULL);
+
+    // Built-in fonts
+    mp_obj_t fira12[2] = { mp_obj_new_str("FiraSans", 8), mp_obj_new_int(12) };
+    mp_obj_list_append(result, mp_obj_new_tuple(2, fira12));
+    mp_obj_t fira20[2] = { mp_obj_new_str("FiraSans", 8), mp_obj_new_int(20) };
+    mp_obj_list_append(result, mp_obj_new_tuple(2, fira20));
+
+    // User fonts (sentinel-terminated; empty when no userfonts.h)
+    for (int i = 0; user_font_table[i].name != NULL; i++) {
+        mp_obj_t entry[2] = {
+            mp_obj_new_str(user_font_table[i].name, strlen(user_font_table[i].name)),
+            mp_obj_new_int(user_font_table[i].size),
+        };
+        mp_obj_list_append(result, mp_obj_new_tuple(2, entry));
+    }
+    return result;
+}
+static MP_DEFINE_CONST_FUN_OBJ_1(epd_obj_list_fonts_obj, epd_obj_list_fonts);
+
+// ─── write_text(x, y, text, size[, font_name]) ───────────────────────────────
+// Write a string at the given font size. font_name defaults to "FiraSans".
 // Uses the font properties set by set_text_color() / set_text_align().
-// Raises ValueError for unsupported sizes.
+// Raises ValueError for unsupported font name or size.
 static mp_obj_t epd_obj_write_text(size_t n_args, const mp_obj_t *args) {
     epd_obj_t *self = MP_OBJ_TO_PTR(args[0]);
     EPD_CHECK_INIT(self);
@@ -550,10 +589,11 @@ static mp_obj_t epd_obj_write_text(size_t n_args, const mp_obj_t *args) {
     int y = mp_obj_get_int(args[2]);
     const char *text = mp_obj_str_get_str(args[3]);
     int size = mp_obj_get_int(args[4]);
+    const char *font_name = (n_args > 5) ? mp_obj_str_get_str(args[5]) : "FiraSans";
 
-    const EpdFont *font = font_from_size(size);
+    const EpdFont *font = font_from_name_size(font_name, size);
     if (!font) {
-        mp_raise_ValueError(MP_ERROR_TEXT("font size must be 12 or 20"));
+        mp_raise_ValueError(MP_ERROR_TEXT("unsupported font name or size"));
     }
 
     uint8_t *fb = epd_hl_get_framebuffer(&self->hl);
@@ -563,11 +603,12 @@ static mp_obj_t epd_obj_write_text(size_t n_args, const mp_obj_t *args) {
     }
     return mp_const_none;
 }
-static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(epd_obj_write_text_obj, 5, 5, epd_obj_write_text);
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(epd_obj_write_text_obj, 5, 6, epd_obj_write_text);
 
-// ─── get_string_rect(x, y, text, size[, margin]) → (x, y, w, h) ──────────────
+// ─── get_string_rect(x, y, text, size[, margin[, font_name]]) → (x, y, w, h) ─
 // Returns the bounding rectangle for the text as a 4-tuple.
 // Handles newlines. margin (default 0) is added to width and height.
+// font_name defaults to "FiraSans".
 static mp_obj_t epd_obj_get_string_rect(size_t n_args, const mp_obj_t *args) {
     epd_obj_t *self = MP_OBJ_TO_PTR(args[0]);
     EPD_CHECK_INIT(self);
@@ -576,10 +617,11 @@ static mp_obj_t epd_obj_get_string_rect(size_t n_args, const mp_obj_t *args) {
     const char *text = mp_obj_str_get_str(args[3]);
     int size   = mp_obj_get_int(args[4]);
     int margin = (n_args > 5) ? mp_obj_get_int(args[5]) : 0;
+    const char *font_name = (n_args > 6) ? mp_obj_str_get_str(args[6]) : "FiraSans";
 
-    const EpdFont *font = font_from_size(size);
+    const EpdFont *font = font_from_name_size(font_name, size);
     if (!font) {
-        mp_raise_ValueError(MP_ERROR_TEXT("font size must be 12 or 20"));
+        mp_raise_ValueError(MP_ERROR_TEXT("unsupported font name or size"));
     }
     EpdFontProperties props = epd_font_properties_default();
     EpdRect r = epd_get_string_rect(font, text, x, y, margin, &props);
@@ -591,11 +633,12 @@ static mp_obj_t epd_obj_get_string_rect(size_t n_args, const mp_obj_t *args) {
     };
     return mp_obj_new_tuple(4, items);
 }
-static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(epd_obj_get_string_rect_obj, 5, 6, epd_obj_get_string_rect);
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(epd_obj_get_string_rect_obj, 5, 7, epd_obj_get_string_rect);
 
-// ─── get_text_bounds(x, y, text, size) → (x1, y1, w, h) ──────────────────────
+// ─── get_text_bounds(x, y, text, size[, font_name]) → (x1, y1, w, h) ─────────
 // Returns the tight bounding box of the text as a 4-tuple.
 // Note: does not handle newlines (epdiy limitation).
+// font_name defaults to "FiraSans".
 static mp_obj_t epd_obj_get_text_bounds(size_t n_args, const mp_obj_t *args) {
     epd_obj_t *self = MP_OBJ_TO_PTR(args[0]);
     EPD_CHECK_INIT(self);
@@ -603,10 +646,11 @@ static mp_obj_t epd_obj_get_text_bounds(size_t n_args, const mp_obj_t *args) {
     int y      = mp_obj_get_int(args[2]);
     const char *text = mp_obj_str_get_str(args[3]);
     int size   = mp_obj_get_int(args[4]);
+    const char *font_name = (n_args > 5) ? mp_obj_str_get_str(args[5]) : "FiraSans";
 
-    const EpdFont *font = font_from_size(size);
+    const EpdFont *font = font_from_name_size(font_name, size);
     if (!font) {
-        mp_raise_ValueError(MP_ERROR_TEXT("font size must be 12 or 20"));
+        mp_raise_ValueError(MP_ERROR_TEXT("unsupported font name or size"));
     }
     EpdFontProperties props = epd_font_properties_default();
     int x1, y1, w, h;
@@ -619,16 +663,19 @@ static mp_obj_t epd_obj_get_text_bounds(size_t n_args, const mp_obj_t *args) {
     };
     return mp_obj_new_tuple(4, items);
 }
-static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(epd_obj_get_text_bounds_obj, 5, 5, epd_obj_get_text_bounds);
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(epd_obj_get_text_bounds_obj, 5, 6, epd_obj_get_text_bounds);
 
-// ─── font_metrics(size) → (ascender, descender, advance_y) ───────────────────
+// ─── font_metrics(size[, font_name]) → (ascender, descender, advance_y) ───────
 // Returns vertical font metrics useful for layout.
-static mp_obj_t epd_obj_font_metrics(mp_obj_t self_in, mp_obj_t size_in) {
-    epd_obj_t *self = MP_OBJ_TO_PTR(self_in);
+// font_name defaults to "FiraSans".
+static mp_obj_t epd_obj_font_metrics(size_t n_args, const mp_obj_t *args) {
+    epd_obj_t *self = MP_OBJ_TO_PTR(args[0]);
     EPD_CHECK_INIT(self);
-    const EpdFont *font = font_from_size(mp_obj_get_int(size_in));
+    int size = mp_obj_get_int(args[1]);
+    const char *font_name = (n_args > 2) ? mp_obj_str_get_str(args[2]) : "FiraSans";
+    const EpdFont *font = font_from_name_size(font_name, size);
     if (!font) {
-        mp_raise_ValueError(MP_ERROR_TEXT("font size must be 12 or 20"));
+        mp_raise_ValueError(MP_ERROR_TEXT("unsupported font name or size"));
     }
     mp_obj_t items[3] = {
         mp_obj_new_int(font->ascender),
@@ -637,7 +684,7 @@ static mp_obj_t epd_obj_font_metrics(mp_obj_t self_in, mp_obj_t size_in) {
     };
     return mp_obj_new_tuple(3, items);
 }
-static MP_DEFINE_CONST_FUN_OBJ_2(epd_obj_font_metrics_obj, epd_obj_font_metrics);
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(epd_obj_font_metrics_obj, 2, 3, epd_obj_font_metrics);
 
 // ─── draw_framebuf(buf, width, height, format, x, y) ─────────────────────────
 // Blit a MicroPython-compatible framebuf (or any buffer-protocol object) onto
@@ -872,6 +919,7 @@ static const mp_rom_map_elem_t epd_obj_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_get_string_rect),  MP_ROM_PTR(&epd_obj_get_string_rect_obj) },
     { MP_ROM_QSTR(MP_QSTR_get_text_bounds),  MP_ROM_PTR(&epd_obj_get_text_bounds_obj) },
     { MP_ROM_QSTR(MP_QSTR_font_metrics),     MP_ROM_PTR(&epd_obj_font_metrics_obj) },
+    { MP_ROM_QSTR(MP_QSTR_list_fonts),       MP_ROM_PTR(&epd_obj_list_fonts_obj) },
     { MP_ROM_QSTR(MP_QSTR_draw_framebuf), MP_ROM_PTR(&epd_obj_draw_framebuf_obj) },
     { MP_ROM_QSTR(MP_QSTR_set_rotation), MP_ROM_PTR(&epd_obj_set_rotation_obj) },
     { MP_ROM_QSTR(MP_QSTR_get_rotation), MP_ROM_PTR(&epd_obj_get_rotation_obj) },

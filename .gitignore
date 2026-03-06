@@ -1,2 +1,6 @@
 build/
 .cache/
+__pycache__/
+fonts/*.ttf
+fonts/*.otf
+module/userfonts/

@@ -26,6 +26,65 @@ install the esp-idf 5.5.2 and esptool
 
 `git tag v1.0.0 && git push origin v1.0.0`
 
+## Adding Custom Fonts
+
+The firmware ships with **FiraSans** at sizes 12 and 20. You can compile additional TTF/OTF fonts into the firmware using the provided scripts. Font binary files are gitignored so there are no licensing issues when committing.
+
+### Prerequisites
+
+```
+pip install freetype-py
+```
+
+### `add_font.py` — convert a single font at one size
+
+```
+python add_font.py <font_file> <FontName> <size> [--compress]
+```
+
+| Argument | Description |
+|----------|-------------|
+| `font_file` | Path to a `.ttf` or `.otf` file |
+| `FontName` | C-identifier name for the font family, e.g. `Roboto` |
+| `size` | Point size as an integer, e.g. `18` |
+| `--compress` | Compress glyph bitmaps with zlib (recommended — saves flash) |
+
+The generated header is placed in `module/userfonts/<FontName>/` and the font registry is updated automatically.
+
+```bash
+python add_font.py ~/Downloads/Roboto-Regular.ttf Roboto 18 --compress
+```
+
+### `convert_fonts.py` — batch-convert an entire folder
+
+Drop any number of `.ttf` / `.otf` files into the `fonts/` directory, then run:
+
+```
+python convert_fonts.py <size1> [<size2> ...] [--compress]
+```
+
+The font family name is derived from the filename stem using CamelCase conversion (`roboto-regular.ttf` → `RobotoRegular`). All fonts in `fonts/` are converted at every requested size in one pass.
+
+```bash
+python convert_fonts.py 16 24 32 --compress
+```
+
+### Using custom fonts
+
+After running either script, rebuild the firmware (`build.sh`). The new fonts are then available by passing the font name to any text method:
+
+```python
+# Built-in font (font_name omitted → defaults to "FiraSans")
+epd.write_text(10, 20, "hello", 12)
+
+# Custom font
+epd.write_text(10, 20, "hello", 18, "Roboto")
+
+# Query all available fonts at runtime
+print(epd.list_fonts())
+# → [('FiraSans', 12), ('FiraSans', 20), ('Roboto', 18)]
+```
+
 ## API Reference
 
 Colors are expressed as integers 0–15 (4-bit grayscale: 0 = black, 15 = white).
@@ -89,7 +148,7 @@ All drawing methods write to an in-memory framebuffer. Call `update()` or `updat
 | `epd.fill_round_rect(x, y, w, h, r, color)` | Draw a filled rounded rectangle with corner radius `r`. |
 | `epd.arc(x, y, r, start, end, color)` | Draw an arc outline of radius `r` centred at `(x, y)` from angle `start` to `end`. |
 | `epd.fill_arc(x, y, r, start, end, color)` | Draw a filled pie wedge (arc + two radii). |
-| `epd.write_text(x, y, text, size)` | Draw `text` using FiraSans at `(x, y)`. `size` must be `12` or `20` (raises `ValueError` otherwise). Uses the colors and alignment set by the methods below. |
+| `epd.write_text(x, y, text, size [, font_name])` | Draw `text` at `(x, y)`. `font_name` defaults to `"FiraSans"`; pass a custom font name to use a user-added font. Raises `ValueError` if the name/size combination is not available. Uses the colors and alignment set by the methods below. |
 | `epd.set_text_color(fg [, bg])` | Set foreground color (and optionally background color) for `write_text`. Colors are 0–15. |
 | `epd.set_text_align(flags)` | Set text alignment / background drawing flags. Pass one or more `epdiy.ALIGN_*` / `epdiy.DRAW_BACKGROUND` constants combined with `\|`. |
 | `epd.reset_text_props()` | Reset all font properties to defaults (black foreground, no background, left-aligned). |
@@ -103,11 +162,10 @@ These methods measure text without drawing anything, useful for layout calculati
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `epd.get_string_rect(x, y, text, size [, margin=0])` | `(x, y, w, h)` | Bounding rectangle of `text` when drawn at `(x, y)`. Handles `\n` newlines. `margin` is added to width and height. |
-| `epd.get_text_bounds(x, y, text, size)` | `(x1, y1, w, h)` | Tight bounding box of `text`. `x1`/`y1` may differ from the cursor position due to glyph offsets. Does not handle newlines. |
-| `epd.font_metrics(size)` | `(ascender, descender, advance_y)` | Vertical metrics of the font: pixels above/below the baseline and line spacing. |
-
-`size` must be `12` or `20` for all three methods.
+| `epd.get_string_rect(x, y, text, size [, margin=0 [, font_name]])` | `(x, y, w, h)` | Bounding rectangle of `text` when drawn at `(x, y)`. Handles `\n` newlines. `margin` is added to width and height. `font_name` defaults to `"FiraSans"`. |
+| `epd.get_text_bounds(x, y, text, size [, font_name])` | `(x1, y1, w, h)` | Tight bounding box of `text`. `x1`/`y1` may differ from the cursor position due to glyph offsets. Does not handle newlines. `font_name` defaults to `"FiraSans"`. |
+| `epd.font_metrics(size [, font_name])` | `(ascender, descender, advance_y)` | Vertical metrics of the font: pixels above/below the baseline and line spacing. `font_name` defaults to `"FiraSans"`. |
+| `epd.list_fonts()` | `[(name, size), ...]` | List all available fonts as `(font_name, size)` tuples — built-in and user-added. |
 
 ```python
 # Centre a label horizontally
