@@ -98,10 +98,9 @@ jobs:
         run: |
           for dir in build-artifacts/firmware-*-${{ github.sha }}; do
             board=$(echo "$dir" | sed 's|build-artifacts/firmware-||; s|-${{ github.sha }}||')
-            for file in micropython.bin bootloader.bin partition-table.bin; do
-              src="$dir/$file"
-              [ -f "$src" ] && mv "$src" "build-artifacts/${board}-${file}"
-            done
+            [ -f "$dir/micropython.bin" ] && mv "$dir/micropython.bin" "build-artifacts/${board}-micropython.bin"
+            [ -f "$dir/bootloader/bootloader.bin" ] && mv "$dir/bootloader/bootloader.bin" "build-artifacts/${board}-bootloader.bin"
+            [ -f "$dir/partition_table/partition-table.bin" ] && mv "$dir/partition_table/partition-table.bin" "build-artifacts/${board}-partition-table.bin"
           done
 
       - name: Create GitHub Release
