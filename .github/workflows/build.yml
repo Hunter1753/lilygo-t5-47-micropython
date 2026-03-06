@@ -38,6 +38,7 @@ jobs:
     container:
       image: espressif/idf:v5.5.2
     strategy:
+      fail-fast: false
       matrix:
         board:
           - LILYGO_T5_47
