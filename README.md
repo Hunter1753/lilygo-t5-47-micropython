@@ -97,6 +97,33 @@ All drawing methods write to an in-memory framebuffer. Call `update()` or `updat
 | `epd.set_rotation(rot)` | Set the display rotation. Pass one of the `epdiy.ROT_*` constants. Affects all subsequent drawing and font calls. |
 | `epd.get_rotation()` | Return the current rotation as an integer (one of the `epdiy.ROT_*` values). |
 
+#### Text measurement
+
+These methods measure text without drawing anything, useful for layout calculations.
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `epd.get_string_rect(x, y, text, size [, margin=0])` | `(x, y, w, h)` | Bounding rectangle of `text` when drawn at `(x, y)`. Handles `\n` newlines. `margin` is added to width and height. |
+| `epd.get_text_bounds(x, y, text, size)` | `(x1, y1, w, h)` | Tight bounding box of `text`. `x1`/`y1` may differ from the cursor position due to glyph offsets. Does not handle newlines. |
+| `epd.font_metrics(size)` | `(ascender, descender, advance_y)` | Vertical metrics of the font: pixels above/below the baseline and line spacing. |
+
+`size` must be `12` or `20` for all three methods.
+
+```python
+# Centre a label horizontally
+x, y, w, h = epd.get_string_rect(0, 100, "Hello world", 20)
+epd.write_text((epdiy.WIDTH - w) // 2, 100, "Hello world", 20)
+
+# Draw a background box with 4 px padding before writing text
+x, y, w, h = epd.get_string_rect(20, 50, "Label", 12, margin=4)
+epd.fill_rect(x, y, w, h, 15)          # white box
+epd.write_text(20, 50, "Label", 12)
+
+# Use font metrics for precise multiline layout
+asc, desc, adv = epd.font_metrics(20)
+line_height = adv                        # pixels between baselines
+```
+
 #### `epd.arc(x, y, r, start, end, color)` / `epd.fill_arc(x, y, r, start, end, color)`
 
 Draw an arc outline or a filled pie wedge centred at `(x, y)` with radius `r`.

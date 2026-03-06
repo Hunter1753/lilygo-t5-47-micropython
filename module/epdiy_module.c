@@ -532,6 +532,13 @@ static mp_obj_t epd_obj_set_text_align(mp_obj_t self_in, mp_obj_t flags_in) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_2(epd_obj_set_text_align_obj, epd_obj_set_text_align);
 
+// ─── Font helpers ─────────────────────────────────────────────────────────────
+static const EpdFont *font_from_size(int size) {
+    if (size == 12) return &FiraSans_12;
+    if (size == 20) return &FiraSans_20;
+    return NULL;
+}
+
 // ─── write_text(x, y, text, size) ────────────────────────────────────────────
 // Write a string using FiraSans at the given font size (12 or 20).
 // Uses the font properties set by set_text_color() / set_text_align().
@@ -544,12 +551,8 @@ static mp_obj_t epd_obj_write_text(size_t n_args, const mp_obj_t *args) {
     const char *text = mp_obj_str_get_str(args[3]);
     int size = mp_obj_get_int(args[4]);
 
-    const EpdFont *font;
-    if (size == 12) {
-        font = &FiraSans_12;
-    } else if (size == 20) {
-        font = &FiraSans_20;
-    } else {
+    const EpdFont *font = font_from_size(size);
+    if (!font) {
         mp_raise_ValueError(MP_ERROR_TEXT("font size must be 12 or 20"));
     }
 
@@ -561,6 +564,80 @@ static mp_obj_t epd_obj_write_text(size_t n_args, const mp_obj_t *args) {
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(epd_obj_write_text_obj, 5, 5, epd_obj_write_text);
+
+// ─── get_string_rect(x, y, text, size[, margin]) → (x, y, w, h) ──────────────
+// Returns the bounding rectangle for the text as a 4-tuple.
+// Handles newlines. margin (default 0) is added to width and height.
+static mp_obj_t epd_obj_get_string_rect(size_t n_args, const mp_obj_t *args) {
+    epd_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+    EPD_CHECK_INIT(self);
+    int x      = mp_obj_get_int(args[1]);
+    int y      = mp_obj_get_int(args[2]);
+    const char *text = mp_obj_str_get_str(args[3]);
+    int size   = mp_obj_get_int(args[4]);
+    int margin = (n_args > 5) ? mp_obj_get_int(args[5]) : 0;
+
+    const EpdFont *font = font_from_size(size);
+    if (!font) {
+        mp_raise_ValueError(MP_ERROR_TEXT("font size must be 12 or 20"));
+    }
+    EpdFontProperties props = epd_font_properties_default();
+    EpdRect r = epd_get_string_rect(font, text, x, y, margin, &props);
+    mp_obj_t items[4] = {
+        mp_obj_new_int(r.x),
+        mp_obj_new_int(r.y),
+        mp_obj_new_int(r.width),
+        mp_obj_new_int(r.height),
+    };
+    return mp_obj_new_tuple(4, items);
+}
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(epd_obj_get_string_rect_obj, 5, 6, epd_obj_get_string_rect);
+
+// ─── get_text_bounds(x, y, text, size) → (x1, y1, w, h) ──────────────────────
+// Returns the tight bounding box of the text as a 4-tuple.
+// Note: does not handle newlines (epdiy limitation).
+static mp_obj_t epd_obj_get_text_bounds(size_t n_args, const mp_obj_t *args) {
+    epd_obj_t *self = MP_OBJ_TO_PTR(args[0]);
+    EPD_CHECK_INIT(self);
+    int x      = mp_obj_get_int(args[1]);
+    int y      = mp_obj_get_int(args[2]);
+    const char *text = mp_obj_str_get_str(args[3]);
+    int size   = mp_obj_get_int(args[4]);
+
+    const EpdFont *font = font_from_size(size);
+    if (!font) {
+        mp_raise_ValueError(MP_ERROR_TEXT("font size must be 12 or 20"));
+    }
+    EpdFontProperties props = epd_font_properties_default();
+    int x1, y1, w, h;
+    epd_get_text_bounds(font, text, &x, &y, &x1, &y1, &w, &h, &props);
+    mp_obj_t items[4] = {
+        mp_obj_new_int(x1),
+        mp_obj_new_int(y1),
+        mp_obj_new_int(w),
+        mp_obj_new_int(h),
+    };
+    return mp_obj_new_tuple(4, items);
+}
+static MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(epd_obj_get_text_bounds_obj, 5, 5, epd_obj_get_text_bounds);
+
+// ─── font_metrics(size) → (ascender, descender, advance_y) ───────────────────
+// Returns vertical font metrics useful for layout.
+static mp_obj_t epd_obj_font_metrics(mp_obj_t self_in, mp_obj_t size_in) {
+    epd_obj_t *self = MP_OBJ_TO_PTR(self_in);
+    EPD_CHECK_INIT(self);
+    const EpdFont *font = font_from_size(mp_obj_get_int(size_in));
+    if (!font) {
+        mp_raise_ValueError(MP_ERROR_TEXT("font size must be 12 or 20"));
+    }
+    mp_obj_t items[3] = {
+        mp_obj_new_int(font->ascender),
+        mp_obj_new_int(font->descender),
+        mp_obj_new_int(font->advance_y),
+    };
+    return mp_obj_new_tuple(3, items);
+}
+static MP_DEFINE_CONST_FUN_OBJ_2(epd_obj_font_metrics_obj, epd_obj_font_metrics);
 
 // ─── draw_framebuf(buf, width, height, format, x, y) ─────────────────────────
 // Blit a MicroPython-compatible framebuf (or any buffer-protocol object) onto
@@ -791,7 +868,10 @@ static const mp_rom_map_elem_t epd_obj_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_set_text_color),   MP_ROM_PTR(&epd_obj_set_text_color_obj) },
     { MP_ROM_QSTR(MP_QSTR_set_text_align),   MP_ROM_PTR(&epd_obj_set_text_align_obj) },
     { MP_ROM_QSTR(MP_QSTR_reset_text_props), MP_ROM_PTR(&epd_obj_reset_text_props_obj) },
-    { MP_ROM_QSTR(MP_QSTR_write_text),       MP_ROM_PTR(&epd_obj_write_text_obj) },
+    { MP_ROM_QSTR(MP_QSTR_write_text),        MP_ROM_PTR(&epd_obj_write_text_obj) },
+    { MP_ROM_QSTR(MP_QSTR_get_string_rect),  MP_ROM_PTR(&epd_obj_get_string_rect_obj) },
+    { MP_ROM_QSTR(MP_QSTR_get_text_bounds),  MP_ROM_PTR(&epd_obj_get_text_bounds_obj) },
+    { MP_ROM_QSTR(MP_QSTR_font_metrics),     MP_ROM_PTR(&epd_obj_font_metrics_obj) },
     { MP_ROM_QSTR(MP_QSTR_draw_framebuf), MP_ROM_PTR(&epd_obj_draw_framebuf_obj) },
     { MP_ROM_QSTR(MP_QSTR_set_rotation), MP_ROM_PTR(&epd_obj_set_rotation_obj) },
     { MP_ROM_QSTR(MP_QSTR_get_rotation), MP_ROM_PTR(&epd_obj_get_rotation_obj) },
